@@ -5,6 +5,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import Toast from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 import PullToRefresh from '../components/PullToRefresh';
+// [HAPUS] import { sendNotification } from '../utils/notify'; <-- HAPUS IMPORT INI
 
 export default function Expenses() {
   const [history, setHistory] = useState([]);
@@ -30,26 +31,9 @@ export default function Expenses() {
   const [yieldEst, setYieldEst] = useState('');
   const [items, setItems] = useState(defaultItems);
 
- // --- HELPER NOTIFIKASI ---
+  // --- HELPER NOTIFIKASI (CUMA TOAST SAJA) ---
   const notify = (msg, type = 'success') => {
       setToast({ show: true, msg, type });
-
-      if ('Notification' in window && Notification.permission === 'granted') {
-          if (navigator.serviceWorker) {
-              navigator.serviceWorker.ready.then((registration) => {
-                  registration.showNotification("Snack Iseng", {
-                      body: msg,
-                      icon: '/pwa-192.png',
-                      badge: '/pwa-192.png',
-                      vibrate: [200, 100, 200],
-                      tag: 'snack-notif',
-                      renotify: true
-                  });
-              });
-          } else {
-              new Notification("Snack Iseng", { body: msg, icon: '/pwa-192.png' });
-          }
-      }
   };
 
   const fetchData = async () => {
@@ -74,7 +58,10 @@ export default function Expenses() {
     setIsUploading(true);
     try {
         await api.post('/expenses/import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        
+        // [HAPUS sendNotification DI SINI]
         notify("Import Excel Berhasil! 📂");
+        
         fetchData();
     } catch (err) { notify("Gagal Import File", "error"); }
     finally { setIsUploading(false); if(fileInputRef.current) fileInputRef.current.value=''; }
@@ -121,7 +108,7 @@ export default function Expenses() {
       }
   };
 
-  // --- Logic Delete Expense ---
+  // --- LOGIC DELETE EXPENSE ---
   const handleDeleteExpense = (id) => {
       setModal({
           show: true,
@@ -131,7 +118,11 @@ export default function Expenses() {
           action: async () => {
               try {
                   await api.delete(`/expenses/${id}`);
+                  
+                  // [HAPUS sendNotification DI SINI]
+                  // Cukup Toast Saja
                   notify("Nota belanja dihapus 🗑️", "error");
+                  
                   fetchData();
                   if (editId === id) cancelEdit();
               } catch (e) {
@@ -150,8 +141,10 @@ export default function Expenses() {
       setModal({ show: true, title: isEditing ? 'Update Data?' : 'Simpan Belanja?', msg: 'Pastikan nominal harga benar.', type: 'info', action: processSave });
   };
 
+  // --- LOGIC SAVE ---
   const processSave = async () => {
       const validItems = items.filter(i => i.name && i.price);
+      
       const payloadItems = validItems.map(i => ({
           id: i.id || null,
           name: i.name,
@@ -169,9 +162,13 @@ export default function Expenses() {
       try {
           if (isEditing) {
               await api.put(`/expenses/${editId}`, payload);
+              
+              // [HAPUS sendNotification DI SINI]
               notify("Data Belanja Diupdate! ✏️");
           } else {
               await api.post('/expenses', payload);
+              
+              // [HAPUS sendNotification DI SINI]
               notify("Belanja Tercatat! 💸");
           }
           cancelEdit();
@@ -254,7 +251,7 @@ export default function Expenses() {
           </div>
       </div>
 
-      {/* HISTORY LIST - DESAIN BARU */}
+      {/* HISTORY LIST */}
       <h3 className="font-bold mb-3">Riwayat Belanja</h3>
 
       {loading ? (
@@ -265,20 +262,18 @@ export default function Expenses() {
                 {currentItems.length > 0 ? currentItems.map(h => (
                     <div key={h.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border dark:border-gray-700 overflow-hidden relative">
                         
-                        {/* HEADER: Tgl & Action Button */}
+                        {/* HEADER */}
                         <div className="p-4 flex justify-between items-start">
                             <div>
                                 <h4 className="font-bold text-blue-600 dark:text-blue-400 text-lg">Belanja</h4>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{formatDateIndo(h.date)}</p>
                                 
-                                {/* META INFO (Disini agar tidak bentrok) */}
                                 <div className="flex gap-2 mt-2">
                                     <div className="flex items-center gap-1 text-[10px] font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-md">
                                         <ShoppingBag size={12} />
                                         {h.items?.length} Items
                                     </div>
                                     
-                                    {/* PERBAIKAN: Selalu tampil, pakai ternary buat cek isi/kosong */}
                                     <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md ${h.yieldEstimate ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500'}`}>
                                         <Package size={12} />
                                         {h.yieldEstimate ? `Hasil: ${h.yieldEstimate} Bks` : 'Hasil: -'}
@@ -297,7 +292,7 @@ export default function Expenses() {
                             </div>
                         </div>
 
-                        {/* LIST ITEM (Gaya Struk) */}
+                        {/* LIST ITEM */}
                         <div className="px-4 py-2">
                             <div className="border-t border-dashed border-gray-200 dark:border-gray-700 my-1"></div>
                             <div className="space-y-1.5 py-2">
@@ -310,7 +305,7 @@ export default function Expenses() {
                             </div>
                         </div>
 
-                        {/* FOOTER: TOTAL HARGA */}
+                        {/* FOOTER */}
                         <div className="bg-gray-50 dark:bg-gray-900/50 px-4 py-3 border-t dark:border-gray-700 flex justify-between items-center">
                             <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Belanja</span>
                             <span className="text-lg font-black text-gray-800 dark:text-white">Rp {h.totalCost.toLocaleString()}</span>

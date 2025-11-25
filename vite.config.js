@@ -6,8 +6,12 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
       devOptions: {
-        enabled: true // <--- INI PENTING BIAR MUNCUL PAS LOCALHOST
+        enabled: true,
+        type: 'module',
       },
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
@@ -23,12 +27,12 @@ export default defineConfig({
         orientation: 'portrait',
         icons: [
           {
-            src: 'pwa-192.png', // Nanti siapin gambar ini di folder public
+            src: 'pwa-192.png',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: 'pwa-512.png', // Nanti siapin gambar ini di folder public
+            src: 'pwa-512.png',
             sizes: '512x512',
             type: 'image/png'
           }

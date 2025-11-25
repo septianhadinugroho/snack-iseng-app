@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import api from '../api';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
-import { TrendingUp, Wallet, ShoppingCart, Activity, LogOut } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { TrendingUp, Wallet, ShoppingCart, Activity, LogOut, Bell } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
 import ConfirmModal from '../components/ConfirmModal';
 import LoadingSpinner from '../components/LoadingSpinner'; // ⬅️ IMPORT BARU
 import PullToRefresh from '../components/PullToRefresh'; // ⬅️ IMPORT BARU
@@ -99,8 +99,14 @@ export default function Dashboard() {
             </h1>
             <p className="text-xs text-gray-500 dark:text-gray-400">Owner Snack Iseng</p>
           </div>
-          <div className="flex gap-2">
-            <button onClick={()=>setShowModal(true)} className="p-2 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-full">
+
+          <div className="flex gap-3 items-center">
+            <Link to="/notifications" className="p-2 bg-orange-100 dark:bg-orange-900/30 text-orange-500 rounded-full hover:bg-orange-200 transition shadow-sm relative group">
+              <Bell size={20} />
+              {/* Titik merah indikator (opsional, visual only for now) */}
+              <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-800"></span>
+            </Link>
+            <button onClick={()=>setShowModal(true)} className="p-2 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-full hover:bg-red-200 transition shadow-sm">
               <LogOut size={20} />
             </button>
           </div>
