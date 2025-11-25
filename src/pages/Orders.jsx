@@ -236,8 +236,15 @@ export default function Orders() {
 
             <div className="flex gap-2">
                 <input type="date" className="bg-white dark:bg-gray-800 p-2 rounded-xl border dark:border-gray-700 text-sm" value={form.date} onChange={e=>setForm({...form, date: e.target.value})}/>
-                <input className="flex-1 bg-white dark:bg-gray-800 p-2 rounded-xl border dark:border-gray-700 outline-none" placeholder="Nama Customer" value={form.customerName} onChange={e=>setForm({...form, customerName: e.target.value})} />
+                <input 
+                    className="flex-1 min-w-0 bg-white dark:bg-gray-800 p-2 rounded-xl border dark:border-gray-700 outline-none shadow-sm focus:ring-2 focus:ring-orange-400 transition" 
+                    placeholder="Nama Customer" 
+                    value={form.customerName} 
+                    onChange={e=>setForm({...form, customerName: e.target.value})} 
+                />
             </div>
+
+            <p className="text-[10px] text-gray-400 italic ml-1">*Tap varian rasa berkali-kali untuk menambah jumlah</p>
             
             <div className="flex flex-wrap gap-2">
                 {products.map(p => (

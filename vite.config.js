@@ -13,7 +13,7 @@ export default defineConfig({
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
         name: 'CMS Snack Iseng',
-        short_name: 'SnackIseng',
+        short_name: 'Snack Iseng',
         description: 'Aplikasi Manajemen Snack Iseng Gacor',
         theme_color: '#ffffff',
         background_color: '#f97316',

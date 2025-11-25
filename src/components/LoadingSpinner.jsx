@@ -1,8 +1,8 @@
 import React from 'react';
 
-export default function LoadingSpinner({ text = "Memuat data..." }) {
+export default function LoadingSpinner({ text = "Memuat data...", fullHeight = true }) {
   return (
-    <div className="flex flex-col items-center justify-center py-20 space-y-4">
+    <div className={`flex flex-col items-center justify-center space-y-4 ${fullHeight ? 'min-h-[90vh]' : 'py-20'}`}>
       <div className="relative w-16 h-16">
         {/* Outer spinning circle */}
         <div className="absolute inset-0 border-4 border-orange-200 dark:border-orange-900 rounded-full"></div>

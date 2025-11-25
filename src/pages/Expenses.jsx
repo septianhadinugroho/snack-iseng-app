@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import api from '../api';
-import { Plus, Trash, Save, Edit, FileSpreadsheet, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { Plus, Trash2, Save, Edit, FileSpreadsheet, ChevronLeft, ChevronRight, ShoppingBag, Package } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 import Toast from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -22,7 +22,7 @@ export default function Expenses() {
 
   // Notification State
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' });
-  const [modal, setModal] = useState({ show: false, title: '', msg: '', action: null });
+  const [modal, setModal] = useState({ show: false, title: '', msg: '', action: null, type: 'info' });
 
   // Form State
   const defaultItems = [{ name: '', quantity: '', price: '' }];
@@ -30,30 +30,24 @@ export default function Expenses() {
   const [yieldEst, setYieldEst] = useState('');
   const [items, setItems] = useState(defaultItems);
 
- // --- HELPER NOTIFIKASI (FIXED FOR MOBILE PWA) ---
+ // --- HELPER NOTIFIKASI ---
   const notify = (msg, type = 'success') => {
-      setToast({ show: true, msg, type }); // Tampilkan Toast di layar
+      setToast({ show: true, msg, type });
 
-      // Cek support notifikasi & izin
       if ('Notification' in window && Notification.permission === 'granted') {
-          // CARA BARU: Gunakan Service Worker Registration
           if (navigator.serviceWorker) {
               navigator.serviceWorker.ready.then((registration) => {
                   registration.showNotification("Snack Iseng", {
                       body: msg,
-                      icon: '/pwa-192.png', // Pastikan icon ini ada
-                      badge: '/pwa-192.png', // Icon kecil di status bar (Android)
+                      icon: '/pwa-192.png',
+                      badge: '/pwa-192.png',
                       vibrate: [200, 100, 200],
-                      tag: 'snack-notif', // Agar notif tidak menumpuk
-                      renotify: true // Agar getar lagi kalau ada notif baru dengan tag sama
+                      tag: 'snack-notif',
+                      renotify: true
                   });
               });
           } else {
-              // Fallback untuk browser lama/desktop biasa
-              new Notification("Snack Iseng", { 
-                  body: msg, 
-                  icon: '/pwa-192.png' 
-              });
+              new Notification("Snack Iseng", { body: msg, icon: '/pwa-192.png' });
           }
       }
   };
@@ -93,7 +87,61 @@ export default function Expenses() {
       setItems(newItems);
   };
   const addItemRow = () => setItems([...items, { name: '', quantity: '', price: '' }]);
-  const removeRow = (index) => { if(items.length > 1) setItems(items.filter((_, i) => i !== index)); };
+
+  // --- Logic Remove Item ---
+  const removeRow = (index) => {
+      const itemToDelete = items[index];
+
+      if (isEditing && itemToDelete.id) {
+          setModal({
+              show: true,
+              title: 'Hapus Item Database?',
+              msg: 'Item ini akan dihapus permanen & total harga diupdate.',
+              type: 'danger',
+              action: async () => {
+                  try {
+                      await api.delete(`/expenses/items/${itemToDelete.id}`);
+                      const newItems = items.filter((_, i) => i !== index);
+                      setItems(newItems.length ? newItems : defaultItems);
+                      notify("Item berhasil dihapus 🗑️");
+                      setModal({ ...modal, show: false });
+                      fetchData(); 
+                  } catch (e) {
+                      notify("Gagal menghapus item", "error");
+                      setModal({ ...modal, show: false });
+                  }
+              }
+          });
+      } else {
+          if(items.length > 1) {
+              setItems(items.filter((_, i) => i !== index));
+          } else {
+              setItems(defaultItems);
+          }
+      }
+  };
+
+  // --- Logic Delete Expense ---
+  const handleDeleteExpense = (id) => {
+      setModal({
+          show: true,
+          title: 'Hapus Nota Belanja?',
+          msg: 'Data belanja ini beserta isinya akan hilang selamanya.',
+          type: 'danger',
+          action: async () => {
+              try {
+                  await api.delete(`/expenses/${id}`);
+                  notify("Nota belanja dihapus 🗑️", "error");
+                  fetchData();
+                  if (editId === id) cancelEdit();
+              } catch (e) {
+                  notify("Gagal hapus nota", "error");
+              } finally {
+                  setModal({ ...modal, show: false });
+              }
+          }
+      });
+  };
 
   // --- Logic Submit ---
   const handleSubmit = () => {
@@ -103,7 +151,21 @@ export default function Expenses() {
   };
 
   const processSave = async () => {
-      const payload = { date, yieldEstimate: yieldEst, description: `Hasil: ${yieldEst || '-'} bungkus`, items: items.filter(i=>i.name && i.price) };
+      const validItems = items.filter(i => i.name && i.price);
+      const payloadItems = validItems.map(i => ({
+          id: i.id || null,
+          name: i.name,
+          quantity: i.quantity,
+          price: i.price
+      }));
+
+      const payload = { 
+          date, 
+          yieldEstimate: yieldEst, 
+          description: `Hasil: ${yieldEst || '-'} bungkus`, 
+          items: payloadItems 
+      };
+
       try {
           if (isEditing) {
               await api.put(`/expenses/${editId}`, payload);
@@ -112,22 +174,36 @@ export default function Expenses() {
               await api.post('/expenses', payload);
               notify("Belanja Tercatat! 💸");
           }
-          setItems(defaultItems); setYieldEst(''); setIsEditing(false); setEditId(null); setModal({show:false, ...modal}); fetchData();
+          cancelEdit();
+          fetchData();
       } catch (e) { notify("Gagal menyimpan data", "error"); }
+      finally { setModal({ ...modal, show: false }); }
   };
 
   const handleEdit = (exp) => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setDate(exp.date);
       setYieldEst(exp.yieldEstimate || '');
-      setItems(exp.items.map(i => ({ name: i.name, quantity: i.quantity, price: i.price })));
+      setItems(exp.items.map(i => ({ 
+          id: i.id,
+          name: i.name, 
+          quantity: i.quantity, 
+          price: i.price 
+      })));
       setIsEditing(true);
       setEditId(exp.id);
   };
-  const cancelEdit = () => { setIsEditing(false); setEditId(null); setItems(defaultItems); setYieldEst(''); };
+
+  const cancelEdit = () => { 
+      setIsEditing(false); 
+      setEditId(null); 
+      setItems(defaultItems); 
+      setYieldEst(''); 
+      setDate(new Date().toISOString().split('T')[0]);
+  };
 
   // --- Helper Format Tanggal Indo ---
-  const formatDateIndo = (d) => new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const formatDateIndo = (d) => new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
 
   // --- LOGIC PAGINATION ---
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -168,7 +244,7 @@ export default function Expenses() {
                       <input placeholder="Nama" className="flex-1 min-w-0 bg-white dark:bg-gray-900 border dark:border-gray-700 rounded p-2 text-xs" value={item.name} onChange={e=>handleItemChange(idx, 'name', e.target.value)} />
                       <input placeholder="Qty" className="w-16 bg-white dark:bg-gray-900 border dark:border-gray-700 rounded p-2 text-xs" value={item.quantity} onChange={e=>handleItemChange(idx, 'quantity', e.target.value)} />
                       <input type="number" placeholder="Rp" className="w-20 bg-white dark:bg-gray-900 border dark:border-gray-700 rounded p-2 text-xs" value={item.price} onChange={e=>handleItemChange(idx, 'price', e.target.value)} />
-                      {items.length>1 && <button onClick={()=>removeRow(idx)} className="text-red-400 p-1"><Trash size={14}/></button>}
+                      <button onClick={()=>removeRow(idx)} className="text-red-400 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg active:scale-95"><Trash2 size={14}/></button>
                   </div>
               ))}
           </div>
@@ -178,44 +254,75 @@ export default function Expenses() {
           </div>
       </div>
 
-      {/* HISTORY LIST */}
+      {/* HISTORY LIST - DESAIN BARU */}
       <h3 className="font-bold mb-3">Riwayat Belanja</h3>
 
       {loading ? (
-        <LoadingSpinner text="Memuat Riwayat Belanja..." />
+        <LoadingSpinner text="Memuat Riwayat Belanja..." fullHeight={false} />
       ) : (
         <PullToRefresh onRefresh={fetchData}>
-            <div className="space-y-3">
-                {currentItems.map(h => (
-                    <div key={h.id} className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border dark:border-gray-700 relative">
-                        <button onClick={()=>handleEdit(h)} className="absolute top-4 right-4 text-blue-500 bg-blue-50 dark:bg-gray-700 p-1.5 rounded-lg hover:bg-blue-100 transition"><Edit size={16}/></button>
+            <div className="space-y-4">
+                {currentItems.length > 0 ? currentItems.map(h => (
+                    <div key={h.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border dark:border-gray-700 overflow-hidden relative">
                         
-                        <div className="flex justify-between items-start mb-2 border-b dark:border-gray-700 pb-2 pr-10">
+                        {/* HEADER: Tgl & Action Button */}
+                        <div className="p-4 flex justify-between items-start">
                             <div>
-                                <span className="font-bold text-blue-600 dark:text-blue-400">Belanja {formatDateIndo(h.date)}</span>
-                                <span className="text-xs text-gray-400 block">{h.items?.length} items</span>
+                                <h4 className="font-bold text-blue-600 dark:text-blue-400 text-lg">Belanja</h4>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{formatDateIndo(h.date)}</p>
+                                
+                                {/* META INFO (Disini agar tidak bentrok) */}
+                                <div className="flex gap-2 mt-2">
+                                    <div className="flex items-center gap-1 text-[10px] font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-md">
+                                        <ShoppingBag size={12} />
+                                        {h.items?.length} Items
+                                    </div>
+                                    
+                                    {/* PERBAIKAN: Selalu tampil, pakai ternary buat cek isi/kosong */}
+                                    <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md ${h.yieldEstimate ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500'}`}>
+                                        <Package size={12} />
+                                        {h.yieldEstimate ? `Hasil: ${h.yieldEstimate} Bks` : 'Hasil: -'}
+                                    </div>
+                                </div>
                             </div>
-                            <div className="text-right">
-                                <span className="font-bold block">Rp {h.totalCost.toLocaleString()}</span>
-                                <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">
-                                    {h.yieldEstimate ? `Hasil: ${h.yieldEstimate} Bks` : 'Belum ada hasil'}
-                                </span>
+
+                            {/* ACTION BUTTONS */}
+                            <div className="flex gap-2">
+                                <button onClick={()=>handleEdit(h)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-gray-700 dark:text-blue-400 transition">
+                                    <Edit size={16}/>
+                                </button>
+                                <button onClick={()=>handleDeleteExpense(h.id)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-100 dark:bg-gray-700 dark:text-red-400 transition">
+                                    <Trash2 size={16}/>
+                                </button>
                             </div>
                         </div>
-                        <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
-                            {h.items?.map((item, i) => (
-                                <div key={i} className="flex justify-between">
-                                    <span>• {item.name} ({item.quantity})</span>
-                                    <span>{item.price.toLocaleString()}</span>
-                                </div>
-                            ))}
+
+                        {/* LIST ITEM (Gaya Struk) */}
+                        <div className="px-4 py-2">
+                            <div className="border-t border-dashed border-gray-200 dark:border-gray-700 my-1"></div>
+                            <div className="space-y-1.5 py-2">
+                                {h.items?.map((item, i) => (
+                                    <div key={i} className="flex justify-between text-xs text-gray-600 dark:text-gray-300">
+                                        <span>• {item.name} <span className="text-gray-400">({item.quantity})</span></span>
+                                        <span className="font-mono">{item.price.toLocaleString()}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* FOOTER: TOTAL HARGA */}
+                        <div className="bg-gray-50 dark:bg-gray-900/50 px-4 py-3 border-t dark:border-gray-700 flex justify-between items-center">
+                            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Belanja</span>
+                            <span className="text-lg font-black text-gray-800 dark:text-white">Rp {h.totalCost.toLocaleString()}</span>
                         </div>
                     </div>
-                ))}
+                )) : (
+                    <div className="text-center py-10 text-gray-400 text-sm">Belum ada data belanja.</div>
+                )}
 
-                {/* PAGINATION CONTROLS */}
+                {/* PAGINATION */}
                 {history.length > itemsPerPage && (
-                    <div className="flex justify-center items-center gap-4 mt-6 text-sm font-bold text-gray-600 dark:text-gray-300">
+                    <div className="flex justify-center items-center gap-4 mt-6 text-sm font-bold text-gray-600 dark:text-gray-300 pb-6">
                         <button onClick={()=>setCurrentPage(prev => Math.max(prev-1, 1))} disabled={currentPage===1} className="p-2 bg-white dark:bg-gray-800 rounded shadow disabled:opacity-50 hover:bg-gray-50"><ChevronLeft size={20}/></button>
                         <span>Halaman {currentPage} / {totalPages}</span>
                         <button onClick={()=>setCurrentPage(prev => Math.min(prev+1, totalPages))} disabled={currentPage===totalPages} className="p-2 bg-white dark:bg-gray-800 rounded shadow disabled:opacity-50 hover:bg-gray-50"><ChevronRight size={20}/></button>
