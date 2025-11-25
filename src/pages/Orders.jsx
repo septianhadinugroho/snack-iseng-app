@@ -3,8 +3,13 @@ import api from '../api';
 import { Search, Trash2, Edit, FileSpreadsheet, Eye, ChevronLeft, ChevronRight, X, FileText } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 import Toast from '../components/Toast';
+import LoadingSpinner from '../components/LoadingSpinner';
+import PullToRefresh from '../components/PullToRefresh'
 
 export default function Orders() {
+
+  const [loading, setLoading] = useState(true);
+
   // --- STATES ---
   const [activeTab, setActiveTab] = useState('new');
   const [products, setProducts] = useState([]);
@@ -75,11 +80,16 @@ export default function Orders() {
   };
 
   const fetchData = async () => {
+    setLoading(true);
     try {
         const [p, o] = await Promise.all([api.get('/products'), api.get('/orders')]);
         setProducts(p.data.products);
         setOrders(o.data);
-    } catch (e) { console.error("Gagal load data"); }
+    } catch (e) { 
+        console.error("Gagal load data"); 
+    } finally {
+        setLoading(false);
+    }
   };
   useEffect(() => { fetchData(); }, []);
 
@@ -282,77 +292,84 @@ export default function Orders() {
             <button onClick={handleSubmit} className={`w-full text-white py-3 rounded-xl font-bold shadow-lg active:scale-95 ${isEditing?'bg-blue-600':'bg-orange-600'}`}>{isEditing?'UPDATE PESANAN':'SIMPAN PESANAN'}</button>
           </div>
         ) : (
-          /* HISTORY TAB */
-          <div className="space-y-4 animate-fade-in">
-              {/* FILTER & SEARCH SECTION */}
-              <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow-sm border dark:border-gray-700 space-y-2">
-                  <div className="relative">
-                      <Search className="absolute left-3 top-2.5 text-gray-400" size={16}/>
-                      <input className="w-full pl-9 p-2 rounded-lg bg-gray-50 dark:bg-gray-900 border dark:border-gray-700 text-sm" placeholder="Cari nama..." value={search} onChange={e=>setSearch(e.target.value)} />
+          /* ====== INI YANG BERUBAH ====== */
+          loading ? (
+            <LoadingSpinner text="Memuat Pesanan..." />
+          ) : (
+            <PullToRefresh onRefresh={fetchData}>
+              <div className="space-y-4 animate-fade-in">
+                  {/* FILTER & SEARCH SECTION */}
+                  <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow-sm border dark:border-gray-700 space-y-2">
+                      <div className="relative">
+                          <Search className="absolute left-3 top-2.5 text-gray-400" size={16}/>
+                          <input className="w-full pl-9 p-2 rounded-lg bg-gray-50 dark:bg-gray-900 border dark:border-gray-700 text-sm" placeholder="Cari nama..." value={search} onChange={e=>setSearch(e.target.value)} />
+                      </div>
+                      <div className="flex gap-2 items-center">
+                          <input type="date" className="flex-1 min-w-0 p-2 rounded-lg bg-gray-50 dark:bg-gray-900 border dark:border-gray-700 text-xs" value={startDate} onChange={e=>setStartDate(e.target.value)} />
+                          <span className="text-gray-400">-</span>
+                          <input type="date" className="flex-1 min-w-0 p-2 rounded-lg bg-gray-50 dark:bg-gray-900 border dark:border-gray-700 text-xs" value={endDate} onChange={e=>setEndDate(e.target.value)} />
+                      </div>
                   </div>
-                  <div className="flex gap-2 items-center">
-                      <input type="date" className="flex-1 min-w-0 p-2 rounded-lg bg-gray-50 dark:bg-gray-900 border dark:border-gray-700 text-xs" value={startDate} onChange={e=>setStartDate(e.target.value)} />
-                      <span className="text-gray-400">-</span>
-                      <input type="date" className="flex-1 min-w-0 p-2 rounded-lg bg-gray-50 dark:bg-gray-900 border dark:border-gray-700 text-xs" value={endDate} onChange={e=>setEndDate(e.target.value)} />
+
+                  <div className="flex p-1 bg-gray-200 dark:bg-gray-800 rounded-lg">
+                      <button onClick={()=>setHistoryTab('ongoing')} className={`flex-1 py-2 text-xs font-bold rounded-md transition ${historyTab==='ongoing'?'bg-white dark:bg-gray-700 shadow text-orange-600':'text-gray-500'}`}>
+                          Dalam Proses ({ongoingOrders.length})
+                      </button>
+                      <button onClick={()=>setHistoryTab('completed')} className={`flex-1 py-2 text-xs font-bold rounded-md transition ${historyTab==='completed'?'bg-white dark:bg-gray-700 shadow text-green-600':'text-gray-500'}`}>
+                          Selesai ({completedOrders.length})
+                      </button>
                   </div>
-              </div>
 
-              <div className="flex p-1 bg-gray-200 dark:bg-gray-800 rounded-lg">
-                  <button onClick={()=>setHistoryTab('ongoing')} className={`flex-1 py-2 text-xs font-bold rounded-md transition ${historyTab==='ongoing'?'bg-white dark:bg-gray-700 shadow text-orange-600':'text-gray-500'}`}>
-                      Dalam Proses ({ongoingOrders.length})
-                  </button>
-                  <button onClick={()=>setHistoryTab('completed')} className={`flex-1 py-2 text-xs font-bold rounded-md transition ${historyTab==='completed'?'bg-white dark:bg-gray-700 shadow text-green-600':'text-gray-500'}`}>
-                      Selesai ({completedOrders.length})
-                  </button>
-              </div>
-
-              {currentItems.length > 0 ? currentItems.map(o => (
-                  <div key={o.id} className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border dark:border-gray-700 relative">
-                      <div className="flex justify-between items-start mb-2">
-                          <div>
-                              <p className="font-bold text-gray-800 dark:text-gray-100">{o.customerName}</p>
-                              <div className="flex gap-2 text-[10px] mt-1 text-gray-500">
-                                  <span>📅 {formatDateIndo(o.date)}</span>
-                                  {o.admin && <span>👮‍♂️ {o.admin.username}</span>}
-                              </div>
-                              
-                              {o.description && (
-                                  <div className="flex items-center gap-1 mt-1 text-[10px] text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 px-1.5 py-0.5 rounded w-fit max-w-[200px]">
-                                      <FileText size={10}/> <span className="truncate">{o.description}</span>
+                  {currentItems.length > 0 ? currentItems.map(o => (
+                      <div key={o.id} className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border dark:border-gray-700 relative">
+                          <div className="flex justify-between items-start mb-2">
+                              <div>
+                                  <p className="font-bold text-gray-800 dark:text-gray-100">{o.customerName}</p>
+                                  <div className="flex gap-2 text-[10px] mt-1 text-gray-500">
+                                      <span>📅 {formatDateIndo(o.date)}</span>
+                                      {o.admin && <span>👮‍♂️ {o.admin.username}</span>}
                                   </div>
-                              )}
+                                  
+                                  {o.description && (
+                                      <div className="flex items-center gap-1 mt-1 text-[10px] text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 px-1.5 py-0.5 rounded w-fit max-w-[200px]">
+                                          <FileText size={10}/> <span className="truncate">{o.description}</span>
+                                      </div>
+                                  )}
 
-                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 line-clamp-1">
-                                  🛒 {o.items.map(i => `${i.productName} (${i.quantity})`).join(', ')}
-                              </p>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 line-clamp-1">
+                                      🛒 {o.items.map(i => `${i.productName} (${i.quantity})`).join(', ')}
+                                  </p>
+                              </div>
+                              <div className="flex gap-1">
+                                  <button onClick={()=>setDetailOrder(o)} className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-600"><Eye size={16} /></button>
+                                  <button onClick={()=>handleEdit(o)} className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-lg"><Edit size={16} /></button>
+                                  <button onClick={()=>handleDelete(o.id)} className="p-2 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-lg"><Trash2 size={16} /></button>
+                              </div>
                           </div>
-                          <div className="flex gap-1">
-                              <button onClick={()=>setDetailOrder(o)} className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-600"><Eye size={16} /></button>
-                              <button onClick={()=>handleEdit(o)} className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-lg"><Edit size={16} /></button>
-                              <button onClick={()=>handleDelete(o.id)} className="p-2 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-lg"><Trash2 size={16} /></button>
+
+                          <div className="flex justify-between items-center border-t dark:border-gray-700 pt-2 mt-2">
+                              <div className="flex gap-1">
+                                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${o.paymentStatus?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}`}>{o.paymentStatus?'LUNAS':'BELUM'}</span>
+                                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${o.isReceived?'bg-blue-100 text-blue-700':'bg-yellow-100 text-yellow-700'}`}>{o.isReceived?'DITERIMA':'DIPROSES'}</span>
+                              </div>
+                              <p className="font-bold text-gray-800 dark:text-gray-100">Rp {o.totalPrice.toLocaleString()}</p>
                           </div>
                       </div>
+                  )) : (
+                      <div className="text-center py-10 text-gray-400 text-sm">Tidak ada pesanan.</div>
+                  )}
 
-                      <div className="flex justify-between items-center border-t dark:border-gray-700 pt-2 mt-2">
-                          <div className="flex gap-1">
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${o.paymentStatus?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}`}>{o.paymentStatus?'LUNAS':'BELUM'}</span>
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${o.isReceived?'bg-blue-100 text-blue-700':'bg-yellow-100 text-yellow-700'}`}>{o.isReceived?'DITERIMA':'DIPROSES'}</span>
-                          </div>
-                          <p className="font-bold text-gray-800 dark:text-gray-100">Rp {o.totalPrice.toLocaleString()}</p>
+                  {currentList.length > itemsPerPage && (
+                      <div className="flex justify-center items-center gap-4 mt-4 text-sm font-bold text-gray-600 dark:text-gray-300">
+                          <button onClick={()=>setCurrentPage(prev => Math.max(prev-1, 1))} disabled={currentPage===1} className="p-2 bg-white dark:bg-gray-800 rounded shadow disabled:opacity-50"><ChevronLeft size={20}/></button>
+                          <span>Halaman {currentPage} / {totalPages}</span>
+                          <button onClick={()=>setCurrentPage(prev => Math.min(prev+1, totalPages))} disabled={currentPage===totalPages} className="p-2 bg-white dark:bg-gray-800 rounded shadow disabled:opacity-50"><ChevronRight size={20}/></button>
                       </div>
-                  </div>
-              )) : (
-                  <div className="text-center py-10 text-gray-400 text-sm">Tidak ada pesanan.</div>
-              )}
-
-              {currentList.length > itemsPerPage && (
-                  <div className="flex justify-center items-center gap-4 mt-4 text-sm font-bold text-gray-600 dark:text-gray-300">
-                      <button onClick={()=>setCurrentPage(prev => Math.max(prev-1, 1))} disabled={currentPage===1} className="p-2 bg-white dark:bg-gray-800 rounded shadow disabled:opacity-50"><ChevronLeft size={20}/></button>
-                      <span>Halaman {currentPage} / {totalPages}</span>
-                      <button onClick={()=>setCurrentPage(prev => Math.min(prev+1, totalPages))} disabled={currentPage===totalPages} className="p-2 bg-white dark:bg-gray-800 rounded shadow disabled:opacity-50"><ChevronRight size={20}/></button>
-                  </div>
-              )}
-          </div>
+                  )}
+              </div>
+            </PullToRefresh>
+          )
+          /* ====== SAMPE SINI ====== */
         )}
       </div>
 

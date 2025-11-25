@@ -2,10 +2,13 @@ import { useEffect, useState, useRef } from 'react';
 import api from '../api';
 import { Plus, Trash, Save, Edit, FileSpreadsheet, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
-import Toast from '../components/Toast'; // Pastikan component Toast sudah ada
+import Toast from '../components/Toast';
+import LoadingSpinner from '../components/LoadingSpinner';
+import PullToRefresh from '../components/PullToRefresh';
 
 export default function Expenses() {
   const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
   
@@ -56,10 +59,15 @@ export default function Expenses() {
   };
 
   const fetchData = async () => {
-     try {
-         const res = await api.get('/expenses');
-         setHistory(res.data);
-     } catch (e) { console.error("Gagal load data"); }
+    setLoading(true);
+    try {
+        const res = await api.get('/expenses');
+        setHistory(res.data);
+    } catch (e) { 
+        console.error("Gagal load data"); 
+    } finally {
+        setLoading(false);
+    }
   };
   useEffect(() => { fetchData() }, []);
 
@@ -172,43 +180,50 @@ export default function Expenses() {
 
       {/* HISTORY LIST */}
       <h3 className="font-bold mb-3">Riwayat Belanja</h3>
-      <div className="space-y-3">
-          {currentItems.map(h => (
-              <div key={h.id} className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border dark:border-gray-700 relative">
-                  <button onClick={()=>handleEdit(h)} className="absolute top-4 right-4 text-blue-500 bg-blue-50 dark:bg-gray-700 p-1.5 rounded-lg hover:bg-blue-100 transition"><Edit size={16}/></button>
-                  
-                  <div className="flex justify-between items-start mb-2 border-b dark:border-gray-700 pb-2 pr-10">
-                      <div>
-                          <span className="font-bold text-blue-600 dark:text-blue-400">Belanja {formatDateIndo(h.date)}</span>
-                          <span className="text-xs text-gray-400 block">{h.items?.length} items</span>
-                      </div>
-                      <div className="text-right">
-                          <span className="font-bold block">Rp {h.totalCost.toLocaleString()}</span>
-                          <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">
-                             {h.yieldEstimate ? `Hasil: ${h.yieldEstimate} Bks` : 'Belum ada hasil'}
-                          </span>
-                      </div>
-                  </div>
-                  <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
-                      {h.items?.map((item, i) => (
-                          <div key={i} className="flex justify-between">
-                              <span>• {item.name} ({item.quantity})</span>
-                              <span>{item.price.toLocaleString()}</span>
-                          </div>
-                      ))}
-                  </div>
-              </div>
-          ))}
 
-          {/* PAGINATION CONTROLS */}
-          {history.length > itemsPerPage && (
-            <div className="flex justify-center items-center gap-4 mt-6 text-sm font-bold text-gray-600 dark:text-gray-300">
-                <button onClick={()=>setCurrentPage(prev => Math.max(prev-1, 1))} disabled={currentPage===1} className="p-2 bg-white dark:bg-gray-800 rounded shadow disabled:opacity-50 hover:bg-gray-50"><ChevronLeft size={20}/></button>
-                <span>Halaman {currentPage} / {totalPages}</span>
-                <button onClick={()=>setCurrentPage(prev => Math.min(prev+1, totalPages))} disabled={currentPage===totalPages} className="p-2 bg-white dark:bg-gray-800 rounded shadow disabled:opacity-50 hover:bg-gray-50"><ChevronRight size={20}/></button>
+      {loading ? (
+        <LoadingSpinner text="Memuat Riwayat Belanja..." />
+      ) : (
+        <PullToRefresh onRefresh={fetchData}>
+            <div className="space-y-3">
+                {currentItems.map(h => (
+                    <div key={h.id} className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border dark:border-gray-700 relative">
+                        <button onClick={()=>handleEdit(h)} className="absolute top-4 right-4 text-blue-500 bg-blue-50 dark:bg-gray-700 p-1.5 rounded-lg hover:bg-blue-100 transition"><Edit size={16}/></button>
+                        
+                        <div className="flex justify-between items-start mb-2 border-b dark:border-gray-700 pb-2 pr-10">
+                            <div>
+                                <span className="font-bold text-blue-600 dark:text-blue-400">Belanja {formatDateIndo(h.date)}</span>
+                                <span className="text-xs text-gray-400 block">{h.items?.length} items</span>
+                            </div>
+                            <div className="text-right">
+                                <span className="font-bold block">Rp {h.totalCost.toLocaleString()}</span>
+                                <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">
+                                    {h.yieldEstimate ? `Hasil: ${h.yieldEstimate} Bks` : 'Belum ada hasil'}
+                                </span>
+                            </div>
+                        </div>
+                        <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
+                            {h.items?.map((item, i) => (
+                                <div key={i} className="flex justify-between">
+                                    <span>• {item.name} ({item.quantity})</span>
+                                    <span>{item.price.toLocaleString()}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+
+                {/* PAGINATION CONTROLS */}
+                {history.length > itemsPerPage && (
+                    <div className="flex justify-center items-center gap-4 mt-6 text-sm font-bold text-gray-600 dark:text-gray-300">
+                        <button onClick={()=>setCurrentPage(prev => Math.max(prev-1, 1))} disabled={currentPage===1} className="p-2 bg-white dark:bg-gray-800 rounded shadow disabled:opacity-50 hover:bg-gray-50"><ChevronLeft size={20}/></button>
+                        <span>Halaman {currentPage} / {totalPages}</span>
+                        <button onClick={()=>setCurrentPage(prev => Math.min(prev+1, totalPages))} disabled={currentPage===totalPages} className="p-2 bg-white dark:bg-gray-800 rounded shadow disabled:opacity-50 hover:bg-gray-50"><ChevronRight size={20}/></button>
+                    </div>
+                )}
             </div>
-          )}
-      </div>
+        </PullToRefresh>
+      )}
     </div>
   );
 }
