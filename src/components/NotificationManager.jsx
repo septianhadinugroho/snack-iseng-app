@@ -58,9 +58,17 @@ export default function NotificationManager() {
           
           // Loop notifikasi baru
           newItems.reverse().forEach(item => {
-             const title = getTitle(item.type, item.action);
-             // Tampilkan notifikasi otomatis dari server
-             showBrowserNotification(title, item.action);
+             // Karena item.action dari backend sekarang sudah detail:
+             // "Order #123: Asep - Balado (2) - Total Rp 10.000"
+             // Kita bisa pakai judul yang simpel saja.
+             
+             let title = 'Info Sistem 🔔';
+             if(item.type === 'ORDER') title = 'Pesanan Baru! 💰';
+             if(item.type === 'EXPENSE') title = 'Belanja Stok 🛒';
+             if(item.action.toLowerCase().includes('hapus')) title = 'Data Dihapus 🗑️';
+             if(item.action.toLowerCase().includes('edit')) title = 'Data Diupdate ✏️';
+
+             showBrowserNotification(title, item.action); // Body-nya sudah detail dari backend
           });
 
           lastLogIdRef.current = latestLog.id;
