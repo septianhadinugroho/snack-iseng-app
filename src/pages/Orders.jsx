@@ -39,14 +39,32 @@ export default function Orders() {
   };
   const [form, setForm] = useState(defaultForm);
 
-  // --- HELPER NOTIFIKASI ---
+  // --- HELPER NOTIFIKASI (FIXED FOR MOBILE PWA) ---
   const notify = (msg, type = 'success') => {
-      setToast({ show: true, msg, type });
-      try {
-          if ('Notification' in window && Notification.permission === 'granted') {
-              new Notification("Snack Iseng Order", { body: msg, icon: '/pwa-192.png' });
+      setToast({ show: true, msg, type }); // Tampilkan Toast di layar
+
+      // Cek support notifikasi & izin
+      if ('Notification' in window && Notification.permission === 'granted') {
+          // CARA BARU: Gunakan Service Worker Registration
+          if (navigator.serviceWorker) {
+              navigator.serviceWorker.ready.then((registration) => {
+                  registration.showNotification("Snack Iseng", {
+                      body: msg,
+                      icon: '/pwa-192.png', // Pastikan icon ini ada
+                      badge: '/pwa-192.png', // Icon kecil di status bar (Android)
+                      vibrate: [200, 100, 200],
+                      tag: 'snack-notif', // Agar notif tidak menumpuk
+                      renotify: true // Agar getar lagi kalau ada notif baru dengan tag sama
+                  });
+              });
+          } else {
+              // Fallback untuk browser lama/desktop biasa
+              new Notification("Snack Iseng", { 
+                  body: msg, 
+                  icon: '/pwa-192.png' 
+              });
           }
-      } catch (e) { console.warn("Notif native skip"); }
+      }
   };
 
   // --- HELPER FORMAT TANGGAL ---

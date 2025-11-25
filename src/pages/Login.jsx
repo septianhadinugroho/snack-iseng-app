@@ -11,6 +11,19 @@ export default function Login() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    
+    // --- [BARU] Request Izin Notifikasi ---
+    // Dipasang di sini agar terhitung sebagai User Gesture (Klik Tombol)
+    if ('Notification' in window && Notification.permission !== 'granted') {
+        try {
+            // Kita await biar popup muncul dulu sebelum loading spin
+            await Notification.requestPermission();
+        } catch (err) {
+            console.warn("Gagal minta izin notif:", err);
+        }
+    }
+    // --------------------------------------
+
     setLoading(true);
     try {
       const { data } = await api.post('/login', { username, password });
@@ -59,7 +72,7 @@ export default function Login() {
         </form>
 
         <p className="text-center text-[10px] text-gray-400 mt-8">
-            © 2025 Snack Iseng Corp.
+            © 2025 Padepokan Corp.
         </p>
       </div>
     </div>
