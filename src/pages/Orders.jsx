@@ -1,9 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import api from '../api';
-// PERBAIKAN: FileText sudah ditambahkan di sini
 import { Search, Trash2, Edit, FileSpreadsheet, Eye, ChevronLeft, ChevronRight, X, FileText } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
-import Toast from '../components/Toast'; // Pastikan file Toast.jsx sudah dibuat
+import Toast from '../components/Toast';
 
 export default function Orders() {
   // --- STATES ---
@@ -40,15 +39,17 @@ export default function Orders() {
   };
   const [form, setForm] = useState(defaultForm);
 
-  // --- HELPER NOTIFIKASI (WEB + PWA) ---
+  // --- HELPER NOTIFIKASI ---
   const notify = (msg, type = 'success') => {
       setToast({ show: true, msg, type });
-      if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification("Snack Iseng Order", { body: msg, icon: '/pwa-192.png' });
-      }
+      try {
+          if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification("Snack Iseng Order", { body: msg, icon: '/pwa-192.png' });
+          }
+      } catch (e) { console.warn("Notif native skip"); }
   };
 
-  // --- HELPER FORMAT TANGGAL (TAMPILAN) ---
+  // --- HELPER FORMAT TANGGAL ---
   const formatDateIndo = (dateStr) => {
       return new Date(dateStr).toLocaleDateString('id-ID', { 
           day: '2-digit', month: '2-digit', year: 'numeric' 
@@ -79,7 +80,7 @@ export default function Orders() {
       if (isEditing) {
           setModal({ show: true, title: 'Simpan Perubahan?', msg: 'Data lama akan ditimpa.', type: 'info', action: processSubmit });
       } else {
-          await processSubmit(); // Input baru langsung gas
+          await processSubmit();
       }
   };
 
@@ -96,14 +97,17 @@ export default function Orders() {
           resetForm();
           fetchData();
           setActiveTab('history');
-      } catch (e) { notify("Gagal simpan data", "error"); }
+      } catch (e) { 
+          console.error(e);
+          notify("Gagal simpan data", "error"); 
+      }
   };
 
   const resetForm = () => {
       setForm(defaultForm);
       setIsEditing(false);
       setEditId(null);
-      setModal({ show: false, ...modal });
+      setModal({ ...modal, show: false });
   };
 
   // --- LOGIC EDIT & DELETE ---
@@ -119,7 +123,7 @@ export default function Orders() {
       });
       setIsEditing(true);
       setEditId(order.id);
-      setDetailOrder(null); // Tutup modal detail
+      setDetailOrder(null); 
       setActiveTab('new');
       window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -128,11 +132,12 @@ export default function Orders() {
       setModal({
           show: true, title: 'Hapus Pesanan?', msg: 'Data hilang selamanya.', type: 'danger', 
           action: async () => {
-              await api.delete(`/orders/${id}`);
-              notify("Pesanan Dihapus! 🗑️", "error");
-              setModal({ show: false, ...modal });
-              setDetailOrder(null);
-              fetchData();
+              try {
+                  await api.delete(`/orders/${id}`);
+                  notify("Pesanan Dihapus! 🗑️", "error");
+                  fetchData();
+              } catch(e) { notify("Gagal hapus", "error"); } 
+              finally { setModal({ ...modal, show: false }); setDetailOrder(null); }
           }
       });
   };
@@ -143,11 +148,9 @@ export default function Orders() {
       const orderDate = new Date(o.date);
       const start = startDate ? new Date(startDate) : null;
       const end = endDate ? new Date(endDate) : null;
-      
       if(start) start.setHours(0,0,0,0);
       if(end) end.setHours(23,59,59,999);
       if(orderDate) orderDate.setHours(12,0,0,0);
-
       const matchDate = (!start || orderDate >= start) && (!end || orderDate <= end);
       return matchName && matchDate;
   });
@@ -263,6 +266,7 @@ export default function Orders() {
         ) : (
           /* HISTORY TAB */
           <div className="space-y-4 animate-fade-in">
+              {/* FILTER & SEARCH SECTION */}
               <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow-sm border dark:border-gray-700 space-y-2">
                   <div className="relative">
                       <Search className="absolute left-3 top-2.5 text-gray-400" size={16}/>
@@ -294,7 +298,6 @@ export default function Orders() {
                                   {o.admin && <span>👮‍♂️ {o.admin.username}</span>}
                               </div>
                               
-                              {/* DESKRIPSI SINGKAT DI CARD */}
                               {o.description && (
                                   <div className="flex items-center gap-1 mt-1 text-[10px] text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 px-1.5 py-0.5 rounded w-fit max-w-[200px]">
                                       <FileText size={10}/> <span className="truncate">{o.description}</span>
@@ -353,7 +356,16 @@ export default function Orders() {
                       <div className={`p-2 rounded font-bold text-center ${detailOrder.isReceived ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'}`}>{detailOrder.isReceived ? 'SUDAH DITERIMA' : 'BELUM DITERIMA'}</div>
                   </div>
 
-                  {/* DESKRIPSI FULL DI DETAIL */}
+                  {/* INI YANG BARU: TAMPILIN METODE BAYAR KALO SUDAH LUNAS */}
+                  {detailOrder.paymentStatus && (
+                      <div className="mb-3 flex justify-between items-center bg-gray-50 dark:bg-gray-800 p-2 rounded-lg border dark:border-gray-700">
+                          <span className="text-xs text-gray-500">Pembayaran via:</span>
+                          <span className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wide">
+                              {detailOrder.paymentMethod || 'Cash'} 
+                          </span>
+                      </div>
+                  )}
+
                   {detailOrder.description && (
                       <div className="mb-4 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-xl border border-yellow-100 dark:border-yellow-800/30 text-xs text-yellow-800 dark:text-yellow-200">
                           <p className="font-bold flex items-center gap-1 mb-1"><FileText size={12}/> Catatan:</p>
