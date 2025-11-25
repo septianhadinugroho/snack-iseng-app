@@ -88,9 +88,9 @@ export default function Dashboard() {
            <p className="text-xs text-gray-500 dark:text-gray-400">Owner Snack Iseng</p>
         </div>
         <div className="flex gap-2">
-            <button onClick={toggleTheme} className="p-2 bg-gray-200 dark:bg-gray-800 rounded-full">
+            {/* <button onClick={toggleTheme} className="p-2 bg-gray-200 dark:bg-gray-800 rounded-full">
                 {isDark ? <Sun size={20} className="text-yellow-400"/> : <Moon size={20} className="text-gray-600"/>}
-            </button>
+            </button> */}
             <button onClick={()=>setShowModal(true)} className="p-2 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-full">
                 <LogOut size={20} />
             </button>
