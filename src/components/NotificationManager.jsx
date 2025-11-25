@@ -8,19 +8,26 @@ export default function NotificationManager() {
 
   const showBrowserNotification = (title, body) => {
     if ('Notification' in window && Notification.permission === 'granted') {
-      const notif = new Notification(title, { // Hapus "Snack Iseng:" biar judul bersih
-        body: body,
-        icon: '/pwa-192.png',
-        badge: '/pwa-192.png',
-        tag: `snack-${Date.now()}`,
-        vibrate: [200, 100, 200],
-      });
       
-      notif.onclick = () => {
-        window.focus();
-        notif.close();
-        navigate('/notifications');
-      };
+      // Cek apakah Service Worker tersedia (Penting buat Mobile)
+      if (navigator.serviceWorker) {
+        navigator.serviceWorker.ready.then((registration) => {
+          registration.showNotification(title, {
+            body: body,
+            icon: '/pwa-192.png',
+            badge: '/pwa-192.png', // Icon kecil di status bar Android
+            tag: `snack-${Date.now()}`, // Tag unik biar gak numpuk
+            vibrate: [200, 100, 200],
+            data: { url: '/notifications' } // Data buat di-handle saat diklik
+          });
+        });
+      } else {
+        // Fallback untuk Desktop lama (Jaga-jaga)
+        new Notification(title, {
+          body: body,
+          icon: '/pwa-192.png',
+        });
+      }
     }
   };
 
