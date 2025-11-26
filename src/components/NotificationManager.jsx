@@ -1,95 +1,76 @@
-import { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import api from '../api';
 
+// Helper Wajib: Mengubah String Base64 dari Server menjadi Uint8Array agar bisa dibaca Browser
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/\-/g, '+')
+    .replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 export default function NotificationManager() {
-  const lastLogIdRef = useRef(null);
-  const navigate = useNavigate();
-
-  const showBrowserNotification = (title, body) => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      
-      // Cek apakah Service Worker tersedia (Penting buat Mobile)
-      if (navigator.serviceWorker) {
-        navigator.serviceWorker.ready.then((registration) => {
-          registration.showNotification(title, {
-            body: body,
-            icon: '/pwa-192.png',
-            badge: '/pwa-192.png', // Icon kecil di status bar Android
-            tag: `snack-${Date.now()}`, // Tag unik biar gak numpuk
-            vibrate: [200, 100, 200],
-            data: { url: '/notifications' } // Data buat di-handle saat diklik
-          });
-        });
-      } else {
-        // Fallback untuk Desktop lama (Jaga-jaga)
-        new Notification(title, {
-          body: body,
-          icon: '/pwa-192.png',
-        });
-      }
-    }
-  };
-
-  // Helper untuk menentukan Judul berdasarkan Action Log
-  const getTitle = (type, action) => {
-    const act = action.toLowerCase();
-    if (type === 'ORDER') {
-        if (act.includes('hapus')) return 'Order Dihapus 🗑️';
-        if (act.includes('edit')) return 'Order Diupdate ✏️';
-        return 'Order Baru! 💰';
-    }
-    if (type === 'EXPENSE') {
-        if (act.includes('hapus')) return 'Belanja Dihapus 🗑️';
-        if (act.includes('edit')) return 'Belanja Diupdate ✏️';
-        return 'Belanja Stok Baru 🛒';
-    }
-    return 'Info Sistem 🔔';
-  };
-
-  const checkNewNotifications = async () => {
-    try {
-      const res = await api.get('/notifications');
-      const logs = res.data;
-
-      if (logs.length > 0) {
-        const latestLog = logs[0];
-
-        if (lastLogIdRef.current === null) {
-          lastLogIdRef.current = latestLog.id;
-          return;
-        }
-
-        if (latestLog.id > lastLogIdRef.current) {
-          const newItems = logs.filter(l => l.id > lastLogIdRef.current);
-          
-          // Loop notifikasi baru
-          newItems.reverse().forEach(item => {
-             // Karena item.action dari backend sekarang sudah detail:
-             // "Order #123: Asep - Balado (2) - Total Rp 10.000"
-             // Kita bisa pakai judul yang simpel saja.
-             
-             let title = 'Info Sistem 🔔';
-             if(item.type === 'ORDER') title = 'Pesanan Baru! 💰';
-             if(item.type === 'EXPENSE') title = 'Belanja Stok 🛒';
-             if(item.action.toLowerCase().includes('hapus')) title = 'Data Dihapus 🗑️';
-             if(item.action.toLowerCase().includes('edit')) title = 'Data Diupdate ✏️';
-
-             showBrowserNotification(title, item.action); // Body-nya sudah detail dari backend
-          });
-
-          lastLogIdRef.current = latestLog.id;
-        }
-      }
-    } catch (error) { /* Silent fail */ }
-  };
-
+  
   useEffect(() => {
-    // Interval polling 5 detik
-    const interval = setInterval(checkNewNotifications, 5000);
-    checkNewNotifications();
-    return () => clearInterval(interval);
+    const subscribeUserToPush = async () => {
+      // 1. Cek apakah browser mendukung Service Worker & Push Manager
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        console.log("Push Notif tidak didukung di browser ini.");
+        return;
+      }
+
+      try {
+        // 2. Tunggu Service Worker siap
+        const registration = await navigator.serviceWorker.ready;
+
+        // 3. Cek apakah user sudah subscribe sebelumnya?
+        let subscription = await registration.pushManager.getSubscription();
+
+        // Kalau belum subscribe, kita buat subscription baru
+        if (!subscription) {
+          // Ambil VAPID Public Key dari Backend kita
+          const { data } = await api.get('/vapid-public-key');
+          const publicVapidKey = data.publicKey;
+
+          if (!publicVapidKey) return;
+
+          // Lakukan proses langganan ke Server Browser (Chrome/FCM)
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+          });
+        }
+
+        // 4. Kirim data subscription (endpoint & keys) ke Backend kita untuk disimpan di DB
+        await api.post('/subscribe', subscription);
+        console.log("Berhasil terhubung ke Push Notification Server!");
+
+      } catch (error) {
+        console.error("Gagal Subscribe Push Notification:", error);
+      }
+    };
+
+    // Jalankan logika di atas HANYA JIKA user sudah login & izin notifikasi sudah 'granted'
+    const token = localStorage.getItem('token');
+    if (token) {
+        if (Notification.permission === 'granted') {
+            subscribeUserToPush();
+        } else if (Notification.permission !== 'denied') {
+            // Minta izin kalau belum pernah ditanya
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    subscribeUserToPush();
+                }
+            });
+        }
+    }
   }, []);
 
-  return null;
+  return null; // Komponen ini tidak merender UI apa-apa
 }
