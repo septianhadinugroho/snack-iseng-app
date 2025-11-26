@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ChevronLeft } from 'lucide-react';
 
 export default function PullToRefresh({ onRefresh, children }) {
@@ -10,24 +10,52 @@ export default function PullToRefresh({ onRefresh, children }) {
   const threshold = 80; // Jarak minimal untuk trigger refresh
   const maxPull = 120; // Batas maksimal tarik
 
+  // Reset scroll saat komponen dipasang agar posisi bersih
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const handleTouchStart = (e) => {
-    // Only activate if scrolled to top
-    if (window.scrollY === 0) {
+    // Gunakan documentElement.scrollTop sebagai fallback & toleransi 1px
+    const scrollTop = window.scrollY || document.documentElement.scrollTop;
+    
+    // Jika posisi scroll di paling atas (atau kurang dari 1px), simpan posisi sentuh awal
+    if (scrollTop <= 1) {
       setStartY(e.touches[0].clientY);
     }
   };
 
   const handleTouchMove = (e) => {
-    if (startY === 0 || isRefreshing || window.scrollY > 0) return;
-    
+    // 1. Cek apakah startY valid & sedang tidak loading
+    if (startY === 0 || isRefreshing) return;
+
     const currentY = e.touches[0].clientY;
+    
+    // 2. Jika user menarik ke atas (scrolling konten biasa), jangan dicegat
+    if (currentY < startY) return;
+
+    // 3. Pastikan window benar-benar di posisi atas
+    if (window.scrollY > 0) return;
+
+    // 4. Hitung jarak tarik
     const distance = Math.min(Math.max(currentY - startY, 0), maxPull);
-    setPullDistance(distance);
+    
+    if (distance > 0) {
+      // [PENTING] Matikan scroll bawaan browser agar tidak konflik (rubber band effect)
+      if (e.cancelable) {
+        e.preventDefault(); 
+      }
+      setPullDistance(distance);
+    }
   };
 
   const handleTouchEnd = async () => {
     if (pullDistance >= threshold && !isRefreshing) {
       setIsRefreshing(true);
+      
+      // Efek getar sedikit jika didukung browser (opsional)
+      if (navigator.vibrate) navigator.vibrate(50); 
+
       await onRefresh();
       setIsRefreshing(false);
     }
@@ -43,17 +71,17 @@ export default function PullToRefresh({ onRefresh, children }) {
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      className="relative"
+      className="relative min-h-screen" // min-h-screen agar area tarik selalu ada
     >
       {/* Pull to Refresh Indicator */}
       <div 
-        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center transition-all duration-300 overflow-hidden"
+        className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center transition-all duration-300 overflow-hidden pointer-events-none" // z-[100] agar di atas header, pointer-events-none agar tembus klik
         style={{ 
           height: isRefreshing ? '60px' : `${pullDistance}px`,
           opacity: pullDistance > 0 ? 1 : 0
         }}
       >
-        <div className="bg-gradient-to-b from-orange-50 to-white dark:from-gray-900 dark:to-gray-800 w-full h-full flex items-center justify-center">
+        <div className="bg-gradient-to-b from-orange-50 to-white dark:from-gray-900 dark:to-gray-800 w-full h-full flex items-center justify-center shadow-sm">
           {isRefreshing ? (
             <div className="flex items-center gap-2">
               <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
@@ -93,7 +121,7 @@ export default function PullToRefresh({ onRefresh, children }) {
                 </div>
               </div>
               <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400">
-                {progress >= 100 ? 'Lepas untuk refresh' : 'Tarik ke bawah'}
+                {progress >= 100 ? 'Lepas!' : 'Tarik'}
               </span>
             </div>
           )}
