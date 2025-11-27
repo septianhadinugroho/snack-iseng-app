@@ -115,6 +115,16 @@ return (
             </div>
           </div>
 
+          {/* 🔥 TARUH DISINI (Di bawah Header, Di atas Statistik) 🔥 */}
+          {user.username === 'demo' && (
+            <div className="bg-yellow-50 text-yellow-700 text-xs font-medium text-center p-3 rounded-xl border border-yellow-200 shadow-sm animate-pulse">
+               🚧 <b>MODE DEMO TAMU</b> <br/>
+               Anda bebas mencoba fitur (Input/Edit/Hapus), <br/>
+               tapi data <b>tidak akan tersimpan</b> ke database asli.
+            </div>
+          )}
+          {/* 🔥🔥🔥 */}
+
           {/* Grid Statistik */}
           <div className="grid grid-cols-2 gap-3">
             <StatCard title="Total Pesanan" val={data.cards.totalOrders} icon={ShoppingCart} color="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300" />
